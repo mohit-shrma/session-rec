@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-class SLIM:
-    def __init(self, l1r=0.01, l2r=0.01):
+class SLIMMethod:
+    def __init__(self, l1r=0.01, l2r=0.01):
         self.params = {
             'dbglvl': 3,
             'algo': 'cd',
