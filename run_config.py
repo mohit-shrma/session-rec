@@ -514,6 +514,7 @@ def create_algorithms_dict( list ):
                     instance = Class(**params)
                     algorithms[key+kv] = instance
         else:
+            print('params: ', params)
             instance = Class(**params)
             algorithms[ key ] = instance
 

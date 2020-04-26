@@ -3,15 +3,15 @@ type: single # single|window, maybe add opt
 key: baselines_and_models_and_hybrids #added to the csv names
 evaluation: evaluation #evaluation|evaluation_last|evaluation_multiple
 data:
-  name: rsc15-100k #added in the end of the csv names
-  folder: data/rsc15/prepared/
-  prefix: yoochoose-clicks-100k
+  name: diginetica #added in the end of the csv names
+  folder: data/diginetica/prepared/
+  prefix: train-item-views
 #  slices: 5 #only window
 #  skip: [0,3] #only window
   opts: {sessions_test: 100}
 
 results:
-  folder: results/next/rsc15-100k/
+  folder: results/next/diginetica/
 
 metrics:
 - class: accuracy.HitRate
@@ -21,9 +21,11 @@ metrics:
 - class: accuracy_multiple.NDCG
   length: [3,5,10,15,20]
 - class: coverage.Coverage
-  length: [20]
+  length: [5,10,20]
 - class: popularity.Popularity
-  length: [20]
+  length: [5,10,20]
+- class: frequency.Frequency
+  length: [5,10,20]
 - class: saver.Saver
   length: [50]
 - class: time_memory_usage.Time_usage_training
@@ -33,8 +35,12 @@ metrics:
 algorithms:
 # ex with parameters
 # baselines
-- class: baselines.ar.AssociationRules
-  key: ar
 - class: knn.slim.SLIMMethod
-  params: { l1r: 0.01, l2r : 0.01}
+  params: { l1r: 1, l2r : 100}
   key: slim
+- class: knn.vsknn.VMContextKNN
+  params: { k: 500, sample_size: 5000, weighting: quadratic , weighting_score: div, idf_weighting: 10 }
+  key: vsknn
+- class: knn.sknn.ContextKNN
+  params: { k: 50, sample_size: 500, similarity: cosine }
+  key: sknn

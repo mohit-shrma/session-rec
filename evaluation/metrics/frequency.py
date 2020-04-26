@@ -1,23 +1,23 @@
-
-class Coverage:
+class Frequency:
     '''
-    Coverage( length=20 )
+    Frequency( length=20 )
 
-    Used to iteratively calculate the coverage of an algorithm regarding the item space. 
+    Used to iteratively calculate the average overall frequency of an algorithm's recommendations. 
 
     Parameters
     -----------
     length : int
-        Coverage@length
+        Frequency@length
     '''
     
-    item_key = 'ItemId'
+    session_key = 'SessionId'
+    item_key    = 'ItemId'
     
     def __init__(self, length=20):
-        self.num_items = 0
-        self.length = length
-        self.time = 0;
-        
+        self.length = length;
+        self.sum = 0
+        self.tests = 0
+    
     def init(self, train):
         '''
         Do initialization work here.
@@ -27,21 +27,26 @@ class Coverage:
         train: pandas.DataFrame
             Training data. It contains the transactions of the sessions. It has one column for session IDs, one for item IDs and one for the timestamp of the events (unix timestamps).
             It must have a header. Column names are arbitrary, but must correspond to the ones you set during the initialization of the network (session_key, item_key, time_key properties).
-        '''        
-        self.coverage_set = set()
-        self.num_items = len( train[self.item_key].unique() )
-        print("Coverage num_items: ", self.num_items)
+        '''
+        self.train_actions = len( train.index )
+        #group the data by the itemIds
+        grp = train.groupby(self.item_key)
+        #count the occurence of every itemid in the trainingdataset
+        self.freq_scores = grp.size()
+        #sort it according to the  score
+        self.freq_scores.sort_values(ascending=False, inplace=True)
+        
         
     def reset(self):
         '''
         Reset for usage in multiple evaluations
         '''
-        self.coverage_set = set()
-        return
-    
+        self.tests=0;
+        self.sum=0
+     
     def skip(self, for_item = 0, session = -1 ):
-        pass
-    
+        pass 
+        
     def add(self, result, next_item, for_item=0, session=0, pop_bin=None, position=None):
         '''
         Update the metric with a result set and the correct next item.
@@ -52,13 +57,17 @@ class Coverage:
         result: pandas.Series
             Series of scores with the item id as the index
         '''
+        #only keep the k- first predictions
         recs = result[:self.length]
+        #take the unique values out of those top scorers
         items = recs.index.unique()
-        self.coverage_set.update( items )
-        
+                
+        self.sum += ( self.freq_scores[ items ].sum() / len( items ) )
+        self.tests += 1
+    
     def add_multiple(self, result, next_items, for_item=0, session=0, position=None):   
         self.add(result, next_items[0], for_item, session)
-        
+    
     def add_batch(self, result, next_item):
         '''
         Update the metric with a result set and the correct next item.
@@ -76,12 +85,9 @@ class Coverage:
             self.add( series, next_item[i] )
             i += 1
         
-        
     def result(self):
         '''
         Return a tuple of a description string and the current averaged value
         '''
-        print("Coverage@" + str(self.length) + ": " + \
-                str(len(self.coverage_set)) + " " + str(self.num_items) + '\n')
-        return ("Coverage@" + str(self.length) + ": "), ( len(self.coverage_set) / self.num_items )
-    
+        return ("Frequency@" + str( self.length ) + ": "), ( self.sum / self.tests )
+        
