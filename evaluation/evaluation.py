@@ -1,6 +1,8 @@
 import time
 import numpy as np
 
+import NNCoverage
+
 def evaluate_sessions_batch(pr, metrics, test_data, train_data, items=None, cut_off=20, session_key='SessionId', item_key='ItemId', time_key='Time', batch_size=100, break_ties=True ):
     '''
     Evaluates the GRU4Rec network wrt. recommendation accuracy measured by recall@N and MRR@N.
@@ -352,7 +354,7 @@ def evaluate_sessions(pr, metrics, test_data, train_data, items=None, cut_off=20
     
     return res
 
-def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
+def evaluate_topk_coverage(pr, test_data, train_data, items=None,
         cut_off=20, k=3, session_key='SessionId', item_key='ItemId', time_key='Time'): 
     '''
     Evaluates the baselines wrt. items'neighbors coverage. Has no batch evaluation capabilities
@@ -361,8 +363,6 @@ def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
     --------
     pr : baseline predictor
         A trained instance of a baseline predictor.
-    metrics : list
-        A list of metric classes providing the proper methods
     test_data : pandas.DataFrame
         Test data. It contains the transactions of the test set.It has one column for session IDs, one for item IDs and one for the timestamp of the events (unix timestamps).
         It must have a header. Column names are arbitrary, but must correspond to the keys you use in this function.
@@ -392,26 +392,37 @@ def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
     count = 0
     print('START evaluation of ', actions, ' actions in ', sessions, ' sessions')
     
-    sc = time.clock();
-    st = time.time();
+    sc = time.clock()
+    st = time.time()
     
     time_sum = 0
     time_sum_clock = 0
     time_count = 0
     
-    for m in metrics:
-        m.reset();
-    
     test_data.sort_values([session_key, time_key], inplace=True)
     items_to_predict = train_data[item_key].unique()
     prev_iid, prev_sid = -1, -1
     pos = 0
-    
+
+    train_item_counts = train_data['ItemId'].value_counts()
+    item_coverages = {}
+
     for item in items_to_predict:
         sid = item
         preds = pr.predict_next(sid, item, items_to_predict, timestamp=0)
-        
-        pass
+        preds[np.isnan(preds)] = 0
+        preds.sort_values( ascending=False, inplace=True)
+        recs = preds[:k]
+        k_items = recs.index.unique()
+        k_item_count = 0.0
+        for k_item in k_items:
+            k_item_count += train_item_counts[k_item]
+        k_item_count /= k
+        item_coverages[item] = k_item_count
+
+    # use the item_coverages to compute average coverages at top-k.
+    nn_coverage_metric = NNCoverage(cut_off)
+    nn_coverage_metric.init(train_data, item_coverages)
 
     for i in range(len(test_data)):
         
@@ -431,16 +442,8 @@ def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
                     
             crs = time.clock();
             trs = time.time();
-            
-            for m in metrics:
-                if hasattr(m, 'start_predict'):
-                    m.start_predict( pr )
-            
+                        
             preds = pr.predict_next(sid, prev_iid, items_to_predict, timestamp=ts)
-            
-            for m in metrics:
-                if hasattr(m, 'stop_predict'):
-                    m.start_predict( pr )
             
             preds[np.isnan(preds)] = 0
 #             preds += 1e-8 * np.random.rand(len(preds)) #Breaking up ties
@@ -450,9 +453,7 @@ def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
             time_sum += time.time()-trs
             time_count += 1
             
-            for m in metrics:
-                if hasattr(m, 'add'):
-                    m.add( preds, iid, for_item=prev_iid, session=sid, position=pos )
+            nn_coverage_metric.add( preds, iid, for_item=prev_iid, session=sid, position=pos )
             
             pos += 1
             
@@ -465,15 +466,8 @@ def evaluate_topk_coverage(pr, metrics, test_data, train_data, items=None,
     print( '    avg rt ', (time_sum/time_count), 's / ', (time_sum_clock/time_count), 'c' )
     print( '    time count ', (time_count), 'count/', (time_sum), ' sum' )
 
-
     res = []
-    for m in metrics:
-        if type(m).__name__ == 'Time_usage_testing':
-            res.append(m.result_second(time_sum_clock/time_count))
-            res.append(m.result_cpu(time_sum_clock / time_count))
-        else:
-            res.append( m.result() )
-
+    res.append(nn_coverage_metric.result())
     
     return res
 

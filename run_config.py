@@ -356,6 +356,10 @@ def eval_algorithm( train, test, key, algorithm, eval, metrics, results, conf, s
             m.stop( algorithm )
     
     results[key] = eval.evaluate_sessions( algorithm, metrics, test, train )
+    results[key].append(eval.evaluate_topk_coverage(algorithm, test, train, cut_off=5))
+    results[key].append(eval.evaluate_topk_coverage(algorithm, test, train, cut_off=10))
+    results[key].append(eval.evaluate_topk_coverage(algorithm, test, train, cut_off=20))
+    
     if out:
         write_results_csv({key:results[key]}, conf, extra=key, iteration=iteration)
     
