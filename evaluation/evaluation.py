@@ -1,7 +1,7 @@
 import time
 import numpy as np
 
-import NNCoverage
+from evaluation.metrics.nncoverage import NNCoverage
 
 def evaluate_sessions_batch(pr, metrics, test_data, train_data, items=None, cut_off=20, session_key='SessionId', item_key='ItemId', time_key='Time', batch_size=100, break_ties=True ):
     '''
